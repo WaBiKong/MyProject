@@ -1,7 +1,7 @@
-from data.load_data_mnist import *
-from Net.LeNet import *
-from Net.AlexNet import *
-from train import *
+from mnist.data.load_data_mnist import *
+from mnist.Net.LeNet import *
+from mnist.Net.AlexNet import *
+from mnist.train import *
 import matplotlib.pyplot as plt
 
 # # LeNet.
