@@ -14,6 +14,3 @@ new_net.load_state_dict(net_state_dict)
 
 # predict(new_net, pre_iter, 6, 'cpu')
 predictTest.predict(new_net, pre_iter, try_gpu())
-
-# 测试
-print("asd")
