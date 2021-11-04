@@ -3,7 +3,6 @@ from mnist.predict import *
 from mnist.Net.LeNet import *
 from mnist.Net.AlexNet import *
 from mnist.data.load_data_mnist import *
-import mnist.predictTest
 
 pre_iter = lada_pre_data(28, resize=224)
 
