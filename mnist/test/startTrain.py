@@ -12,22 +12,20 @@ import matplotlib.pyplot as plt
 
 # AlexNet
 batch_size = 28
-train_iter, test_iter = load_data_mnist(batch_size, 28)
+train_iter, test_iter = load_data_mnist(batch_size, 224)
 net = returnAlexNet()
 lr, num_epochs = 0.01, 10
 
-for i, (X, y) in enumerate(test_iter, start=1):
-    for a in range(X.shape[0]):
-        plt.subplot(4, 7, a + 1)
-        plt.tight_layout()
-        plt.imshow(X[a][0], cmap='gray')
-        plt.title("Ground Truth: {}".format(y[a]))
-        plt.xticks([])
-        plt.yticks([])
-    plt.show()
-    break
+# # 查看数据集每个批量所含图片数量，图片大小，labels数量
+# batch_size = 28
+# train_iter, test_iter = load_data_mnist(batch_size)
+# for i, (X, y) in enumerate(train_iter):
+#     print(X.shape)
+#     print(y.shape)
+#     break
 
-# train(net, train_iter, test_iter, num_epochs, lr, try_gpu())
-#
-# # 模型保存
-# torch.save(net.state_dict(), '../Net/AlexNet.pt')
+train(net, train_iter, test_iter, num_epochs, lr, try_gpu())
+
+
+# 模型保存
+torch.save(net.state_dict(), '../Net/AlexNet.pt')

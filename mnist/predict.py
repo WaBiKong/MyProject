@@ -2,6 +2,7 @@
 import torch
 from matplotlib import pyplot as plt
 
+
 def get_mnist_labels(labels):
     """返回Fashion-MNIST数据集的文本标签"""
     text_labels = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
@@ -45,9 +46,9 @@ def predict(net, test_iter, n, device=None):
     for i in range(n):
         print(f'true is {trues[i]}, pred is {preds[i]}')
     if device == 'cpu':
-        titles = ['true= ' + true + '\n' + 'pre= ' + pred for true, pred in zip(trues, preds)]
+        titles = ['The true is: ' + true + '\n\n' + 'The predicted is: ' + pred for true, pred in zip(trues, preds)]
         show_images(
-            X[0:n].reshape((n, 224, 224)), 1, n, titles=titles[0:n]
+            X[0:n].reshape((n, 224, 224)), 2, int(n / 2), titles=titles[0:n]
         )
         plt.show()
 

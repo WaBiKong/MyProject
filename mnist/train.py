@@ -8,12 +8,15 @@ import Accumulator
 
 def train(net, train_iter, test_iter, num_epochs, lr, device=None):
     """用GPU训练模型"""
+
     def init_weights(m):
         if type(m) == nn.Linear or type(m) == nn.Conv2d:
             nn.init.xavier_uniform_(m.weight)
+
     net.apply(init_weights)
     print('training on', device)
     net.to(device)
+    # 使用小批量随机梯度下降法
     optimizer = torch.optim.SGD(net.parameters(), lr=lr)
     loss = nn.CrossEntropyLoss()
     animator = Animator.Animator(xlabel='epoch', xlim=[1, num_epochs], legend=['train loss', 'train acc', 'test acc'])

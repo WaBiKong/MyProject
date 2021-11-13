@@ -1,6 +1,7 @@
 from IPython import display
 from matplotlib import pyplot as plt
 
+
 # 设置 matplotlib 的轴
 def set_axes(axes, xlabel, ylabel, xlim, ylim, xscale, yscale, legend):
     """设置 matplotlib 的轴。"""
