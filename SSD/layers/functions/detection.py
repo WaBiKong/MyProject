@@ -9,6 +9,9 @@ class Detect(Function):
     apply non-maximum suppression to location predictions based on conf
     scores and threshold to a top_k number of output predictions for both
     confidence score and locations.
+    在测试时，Detect 是 SSD 的最后一层。
+    解码位置预测，基于conf分数和阈值对置信度分数和位置的输出预测的top_k数量
+    应用非最大抑制到位置预测。
     """
     def __init__(self, num_classes, bkg_label, top_k, conf_thresh, nms_thresh):
         self.num_classes = num_classes

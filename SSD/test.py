@@ -78,10 +78,10 @@ def test_net(save_folder, net, cuda, testset, transform, thresh):
 
 def test_voc():
     # load net
-    num_classes = len(VOC_CLASSES) + 1 # +1 background
-    net = build_ssd('test', 300, num_classes) # initialize SSD
+    num_classes = len(VOC_CLASSES) + 1  # +1：背景
+    net = build_ssd('test', 300, num_classes)  # initialize SSD
     net.load_state_dict(torch.load(args.trained_model))
-    net.eval()
+    net.eval()  # 申明为评估函数
     print('Finished loading model!')
     # load data
     testset = VOCDetection(args.voc_root, [('2007', 'test')], None, VOCAnnotationTransform())
@@ -92,6 +92,7 @@ def test_voc():
     test_net(args.save_folder, net, args.cuda, testset,
              BaseTransform(net.size, (104, 117, 123)),
              thresh=args.visual_threshold)
+
 
 if __name__ == '__main__':
     test_voc()

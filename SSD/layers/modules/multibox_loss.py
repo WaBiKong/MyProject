@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from data import coco as cfg
+from SSD.data import coco as cfg
 from ..box_utils import match, log_sum_exp
 
 
@@ -27,7 +27,6 @@ class MultiBoxLoss(nn.Module):
             l: predicted boxes,
             g: ground truth boxes
             N: number of matched default boxes
-        See: https://arxiv.org/pdf/1512.02325.pdf for more details.
     """
 
     def __init__(self, num_classes, overlap_thresh, prior_for_matching,

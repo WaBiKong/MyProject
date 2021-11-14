@@ -102,7 +102,7 @@ class Timer(object):
 
 
 def parse_rec(filename):
-    """ Parse a PASCAL VOC xml file """
+    """ 解析 Parse a PASCAL VOC xml file """
     tree = ET.parse(filename)
     objects = []
     for obj in tree.findall('object'):
@@ -122,7 +122,11 @@ def parse_rec(filename):
 
 
 def get_output_dir(name, phase):
-    """Return the directory where experimental artifacts are placed.
+    """
+    返回放置实验工件的目录。
+    如果该目录不存在，则创建它。
+    使用来自 imdb 和网络（如果不是 None）的名称构建规范路径。
+    Return the directory where experimental artifacts are placed.
     If the directory does not exist, it is created.
     A canonical path is built using the name from an imdb and a network
     (if not None).

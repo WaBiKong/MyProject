@@ -14,7 +14,11 @@ def intersect(box_a, box_b):
 
 
 def jaccard_numpy(box_a, box_b):
-    """Compute the jaccard overlap of two sets of boxes.  The jaccard overlap
+    """
+    计算 IoU
+    计算两组框的jaccard重叠。杰卡德重叠只是两个盒子的并集的交集。
+    我们在这里操作真实值框和默认框
+    Compute the jaccard overlap of two sets of boxes.  The jaccard overlap
     is simply the intersection over union of two boxes.
     E.g.:
         A ∩ B / A ∪ B = A ∩ B / (area(A) + area(B) - A ∩ B)
@@ -34,7 +38,9 @@ def jaccard_numpy(box_a, box_b):
 
 
 class Compose(object):
-    """Composes several augmentations together.
+    """
+    将多个数据增强组合在一起
+    Composes several augmentations together.
     Args:
         transforms (List[Transform]): list of transforms to compose.
     Example:
@@ -54,7 +60,9 @@ class Compose(object):
 
 
 class Lambda(object):
-    """Applies a lambda as a transform."""
+    """
+    应用lambda作为变换
+    Applies a lambda as a transform."""
 
     def __init__(self, lambd):
         assert isinstance(lambd, types.LambdaType)
@@ -348,7 +356,9 @@ class RandomMirror(object):
 
 
 class SwapChannels(object):
-    """Transforms a tensorized image by swapping the channels in the order
+    """
+    通过按交换元组中指定的顺序交换通道来转换张量化图像。
+    Transforms a tensorized image by swapping the channels in the order
      specified in the swap tuple.
     Args:
         swaps (int triple): final order of channels

@@ -3,7 +3,9 @@ import torch
 
 
 def point_form(boxes):
-    """ Convert prior_boxes to (xmin, ymin, xmax, ymax)
+    """
+    将默认框从中心表示法转换为四个点坐标
+    Convert prior_boxes to (xmin, ymin, xmax, ymax)
     representation for comparison to point form ground truth data.
     Args:
         boxes: (tensor) center-size default boxes from priorbox layers.
@@ -15,7 +17,9 @@ def point_form(boxes):
 
 
 def center_size(boxes):
-    """ Convert prior_boxes to (cx, cy, w, h)
+    """
+    将默认框从四个点坐标转换为中心表示法
+    Convert prior_boxes to (cx, cy, w, h)
     representation for comparison to center-size form ground truth data.
     Args:
         boxes: (tensor) point_form boxes
@@ -27,7 +31,9 @@ def center_size(boxes):
 
 
 def intersect(box_a, box_b):
-    """ We resize both tensors to [A,B,2] without new malloc:
+    """
+    计算两个框之间的交集
+    We resize both tensors to [A,B,2] without new malloc:
     [A,2] -> [A,1,2] -> [A,B,2]
     [B,2] -> [1,B,2] -> [A,B,2]
     Then we compute the area of intersect between box_a and box_b.
@@ -48,7 +54,11 @@ def intersect(box_a, box_b):
 
 
 def jaccard(box_a, box_b):
-    """Compute the jaccard overlap of two sets of boxes.  The jaccard overlap
+    """
+    计算 IoU
+    计算两组框的jaccard重叠。杰卡德重叠只是两个盒子的并集的交集。
+    我们在这里操作真实值框和默认框
+    Compute the jaccard overlap of two sets of boxes.  The jaccard overlap
     is simply the intersection over union of two boxes.  Here we operate on
     ground truth boxes and default boxes.
     E.g.:
@@ -69,7 +79,9 @@ def jaccard(box_a, box_b):
 
 
 def match(threshold, truths, priors, variances, labels, loc_t, conf_t, idx):
-    """Match each prior box with the ground truth box of the highest jaccard
+    """
+    将每个默认框与最高jaccard的真实框匹配重叠，编码边界框，然后返回匹配的索引对应于置信度和位置预测。
+    Match each prior box with the ground truth box of the highest jaccard
     overlap, encode the bounding boxes, then return the matched indices
     corresponding to both confidence and location preds.
     Args:
@@ -112,7 +124,9 @@ def match(threshold, truths, priors, variances, labels, loc_t, conf_t, idx):
 
 
 def encode(matched, priors, variances):
-    """Encode the variances from the priorbox layers into the ground truth boxes
+    """
+    将来自priorbox层的方差编码到我们与先前框匹配（基于jaccard 重叠）的真实框中。
+    Encode the variances from the priorbox layers into the ground truth boxes
     we have matched (based on jaccard overlap) with the prior boxes.
     Args:
         matched: (tensor) Coords of ground truth for each prior in point-form
@@ -137,7 +151,9 @@ def encode(matched, priors, variances):
 
 # Adapted from https://github.com/Hakuyume/chainer-ssd
 def decode(loc, priors, variances):
-    """Decode locations from predictions using priors to undo
+    """
+    使用先验从预测中解码位置以撤消我们在训练时为偏移回归所做的编码
+    Decode locations from predictions using priors to undo
     the encoding we did for offset regression at train time.
     Args:
         loc (tensor): location predictions for loc layers,
@@ -158,7 +174,10 @@ def decode(loc, priors, variances):
 
 
 def log_sum_exp(x):
-    """Utility function for computing log_sum_exp while determining
+    """
+    用于在确定时计算 log_sum_exp 的实用函数
+    这将用于确定批次中所有示例的非平均置信度损失。
+    Utility function for computing log_sum_exp while determining
     This will be used to determine unaveraged confidence loss across
     all examples in a batch.
     Args:
@@ -172,7 +191,9 @@ def log_sum_exp(x):
 # https://github.com/fmassa/object-detection.torch
 # Ported to PyTorch by Max deGroot (02/01/2017)
 def nms(boxes, scores, overlap=0.5, top_k=200):
-    """Apply non-maximum suppression at test time to avoid detecting too many
+    """
+    在测试时应用非最大抑制以避免检测到给定对象的太多重叠边界框
+    Apply non-maximum suppression at test time to avoid detecting too many
     overlapping bounding boxes for a given object.
     Args:
         boxes: (tensor) The location preds for the img, Shape: [num_priors,4].
