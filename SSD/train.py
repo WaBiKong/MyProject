@@ -29,13 +29,13 @@ parser.add_argument('--dataset_root', default=VOC_ROOT,
                     help='Dataset root directory path')
 parser.add_argument('--basenet', default='vgg16_reducedfc.pth',
                     help='Pretrained base model')
-parser.add_argument('--batch_size', default=32, type=int,
+parser.add_argument('--batch_size', default=4, type=int,
                     help='Batch size for training')
 parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from')
 parser.add_argument('--start_iter', default=0, type=int,
                     help='Resume training at this iter')
-parser.add_argument('--num_workers', default=4, type=int,
+parser.add_argument('--num_workers', default=0, type=int,
                     help='Number of workers used in dataloading')
 parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use CUDA to train model')
@@ -53,10 +53,10 @@ parser.add_argument('--save_folder', default='weights/',
                     help='Directory for saving checkpoint models')
 args = parser.parse_args()
 
-
 if torch.cuda.is_available():
     if args.cuda:
-        torch.set_default_tensor_type('torch.cuda.FloatTensor')
+        # torch.set_default_tensor_type('torch.cuda.FloatTensor')
+        print("注释掉了：torch.set_default_tensor_type('torch.cuda.FloatTensor')")
     if not args.cuda:
         print("WARNING: It looks like you have a CUDA device, but aren't " +
               "using CUDA.\nRun with --cuda for optimal training speed.")
@@ -69,26 +69,31 @@ if not os.path.exists(args.save_folder):
 
 
 def train():
-    if args.dataset == 'COCO':
-        if args.dataset_root == VOC_ROOT:
-            if not os.path.exists(COCO_ROOT):
-                parser.error('Must specify dataset_root if specifying dataset')
-            print("WARNING: Using default COCO dataset_root because " +
-                  "--dataset_root was not specified.")
-            args.dataset_root = COCO_ROOT
-        cfg = coco
-        # 利用COCODetection重写了Dataset类，并传入了所需的数据变换transform
-        dataset = COCODetection(root=args.dataset_root,
-                                transform=SSDAugmentation(cfg['min_dim'],
-                                                          MEANS))
-    elif args.dataset == 'VOC':
-        if args.dataset_root == COCO_ROOT:
-            parser.error('Must specify dataset if specifying dataset_root')
-        cfg = voc
-        # 利用VOCDetection重写了Dataset类，并传入了所需的数据变换transform
-        dataset = VOCDetection(root=args.dataset_root,
-                               transform=SSDAugmentation(cfg['min_dim'],
-                                                         MEANS))
+    # if args.dataset == 'COCO':
+    #     if args.dataset_root == VOC_ROOT:
+    #         if not os.path.exists(COCO_ROOT):
+    #             parser.error('Must specify dataset_root if specifying dataset')
+    #         print("WARNING: Using default COCO dataset_root because " +
+    #               "--dataset_root was not specified.")
+    #         args.dataset_root = COCO_ROOT
+    #     cfg = coco
+    #     # 利用COCODetection重写了Dataset类，并传入了所需的数据变换transform
+    #     dataset = COCODetection(root=args.dataset_root,
+    #                             transform=SSDAugmentation(cfg['min_dim'],
+    #                                                       MEANS))
+    # elif args.dataset == 'VOC':
+    #     if args.dataset_root == COCO_ROOT:
+    #         parser.error('Must specify dataset if specifying dataset_root')
+    #     cfg = voc
+    #     # 利用VOCDetection重写了Dataset类，并传入了所需的数据变换transform
+    #     dataset = VOCDetection(root=args.dataset_root,
+    #                            transform=SSDAugmentation(cfg['min_dim'],
+    #                                                      MEANS))
+    cfg = voc
+    # 利用VOCDetection重写了Dataset类，并传入了所需的数据变换transform
+    dataset = VOCDetection(root=args.dataset_root,
+                           transform=SSDAugmentation(cfg['min_dim'],
+                                                     MEANS))
 
     if args.visdom:
         import visdom

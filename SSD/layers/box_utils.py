@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import torch
 
+device = 'cuda:0'
 
 def point_form(boxes):
     """
@@ -45,10 +46,10 @@ def intersect(box_a, box_b):
     """
     A = box_a.size(0)
     B = box_b.size(0)
-    max_xy = torch.min(box_a[:, 2:].unsqueeze(1).expand(A, B, 2),
-                       box_b[:, 2:].unsqueeze(0).expand(A, B, 2))
-    min_xy = torch.max(box_a[:, :2].unsqueeze(1).expand(A, B, 2),
-                       box_b[:, :2].unsqueeze(0).expand(A, B, 2))
+    max_xy = torch.min(box_a[:, 2:].unsqueeze(1).expand(A, B, 2).to(device),
+                       box_b[:, 2:].unsqueeze(0).expand(A, B, 2).to(device))
+    min_xy = torch.max(box_a[:, :2].unsqueeze(1).expand(A, B, 2).to(device),
+                       box_b[:, :2].unsqueeze(0).expand(A, B, 2).to(device))
     inter = torch.clamp((max_xy - min_xy), min=0)
     return inter[:, :, 0] * inter[:, :, 1]
 
@@ -71,9 +72,9 @@ def jaccard(box_a, box_b):
     """
     inter = intersect(box_a, box_b)
     area_a = ((box_a[:, 2]-box_a[:, 0]) *
-              (box_a[:, 3]-box_a[:, 1])).unsqueeze(1).expand_as(inter)  # [A,B]
+              (box_a[:, 3]-box_a[:, 1])).unsqueeze(1).expand_as(inter).to(device)  # [A,B]
     area_b = ((box_b[:, 2]-box_b[:, 0]) *
-              (box_b[:, 3]-box_b[:, 1])).unsqueeze(0).expand_as(inter)  # [A,B]
+              (box_b[:, 3]-box_b[:, 1])).unsqueeze(0).expand_as(inter).to(device)  # [A,B]
     union = area_a + area_b - inter
     return inter / union  # [A,B]
 
@@ -137,6 +138,10 @@ def encode(matched, priors, variances):
     Return:
         encoded boxes (tensor), Shape: [num_priors, 4]
     """
+
+    matched = matched.to(device)
+    priors = priors.to(device)
+    # variances = variances.to(device)
 
     # dist b/t match center and prior's center
     g_cxcy = (matched[:, :2] + matched[:, 2:])/2 - priors[:, :2]

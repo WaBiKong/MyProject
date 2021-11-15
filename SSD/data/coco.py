@@ -8,7 +8,8 @@ import torchvision.transforms as transforms
 import cv2
 import numpy as np
 
-COCO_ROOT = osp.join(HOME, 'data/coco/')
+# COCO_ROOT = osp.join(HOME, 'data/coco/')
+COCO_ROOT = 'F:/github/MyProject/SSD/data/coco/'
 IMAGES = 'images'
 ANNOTATIONS = 'annotations'
 COCO_API = 'PythonAPI'
@@ -44,7 +45,8 @@ class COCOAnnotationTransform(object):
     Initilized with a dictionary lookup of classnames to indexes
     """
     def __init__(self):
-        self.label_map = get_label_map(osp.join(COCO_ROOT, 'coco_labels.txt'))
+        # self.label_map = get_label_map(osp.join(COCO_ROOT, 'coco/coco_labels.txt'))
+        self.label_map = get_label_map('F:/github/MyProject/SSD/data/coco/coco_labels.txt')
 
     def __call__(self, target, width, height):
         """

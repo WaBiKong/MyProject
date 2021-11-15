@@ -25,7 +25,8 @@ VOC_CLASSES = (  # always index 0
     'sheep', 'sofa', 'train', 'tvmonitor')
 
 # note: if you used our download scripts, this should be right
-VOC_ROOT = osp.join(HOME, "data/VOCdevkit/")
+# VOC_ROOT = osp.join(HOME, "data/VOCdevkit/")
+VOC_ROOT = 'F:/github/MyProject/SSD/data/VOCdevkit/'
 
 
 class VOCAnnotationTransform(object):
@@ -103,12 +104,15 @@ class VOCDetection(data.Dataset):
         self.transform = transform
         self.target_transform = target_transform
         self.name = dataset_name
-        self._annopath = osp.join('%s', 'Annotations', '%s.xml')
-        self._imgpath = osp.join('%s', 'JPEGImages', '%s.jpg')
+        # self._annopath = osp.join('%s', 'Annotations', '%s.xml')
+        self._annopath = '%s' + '/Annotations/' + '%s.xml'
+        # self._imgpath = osp.join('%s', 'JPEGImages', '%s.jpg')
+        self._imgpath = '%s' + '/JPEGImages/' + '%s.jpg'
         self.ids = list()
         for (year, name) in image_sets:
             rootpath = osp.join(self.root, 'VOC' + year)
-            for line in open(osp.join(rootpath, 'ImageSets', 'Main', name + '.txt')):
+            # for line in open(osp.join(rootpath, 'ImageSets', 'Main', name + '.txt')):
+            for line in open('F:/github/MyProject/SSD/data/VOCdevkit/VOC' + year + '/ImageSets/Main/trainval.txt'):
                 self.ids.append((rootpath, line.strip()))
 
     def __getitem__(self, index):
@@ -121,7 +125,6 @@ class VOCDetection(data.Dataset):
 
     def pull_item(self, index):
         img_id = self.ids[index]
-
         target = ET.parse(self._annopath % img_id).getroot()
         img = cv2.imread(self._imgpath % img_id)
         height, width, channels = img.shape
