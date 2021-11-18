@@ -15,7 +15,7 @@ def main():
     random.seed(0)  # 设置随机种子，保证随机结果可复现
 
     # 获取拥有图片名称的文件路径
-    files_path = "data/VOCdevkit/VOC2012/JPEGImages"
+    files_path = "./data/VOCdevkit/VOC2012/JPEGImages"
     assert os.path.exists(files_path), f'path:{files_path} does not exist.'
 
     val_rate = 0.5  # 设置验证集和训练集的比例为0.5

@@ -2,7 +2,7 @@
 
 # -------------------------------------------------------------------------------
 # Name:         faster_rcnn_farmework.py
-# Description:
+# Description:  faste_rcnn基本框架
 # Author:       WaBiKong
 # Date:         2021/11/17
 # -------------------------------------------------------------------------------
@@ -13,6 +13,8 @@ from torch import nn
 import torch.nn.functional as F
 from collections import OrderedDict
 from typing import Tuple, List, Dict, Optional, Union
+
+from transform import GeneralizedRCNNTransform
 
 
 class FasterRCNNBase(nn.Module):
@@ -232,7 +234,7 @@ class FasterRCNN(FasterRCNNBase):
 
     def __init__(self, backbone, num_classes=None,  # num_classes: 类别数 + 1
                  # transform parameter
-                 min_szie=800, max_size=1333,  # 预处理resize时限制的最大尺寸
+                 min_size=800, max_size=1333,  # 预处理resize时限制的最大尺寸
                  image_mean=None, image_std=None,  # 预处理normalize时使用的均值和方差
                  # RPN parameters
                  rpn_anchor_generator=None,  # anchor生成器
@@ -249,7 +251,7 @@ class FasterRCNN(FasterRCNNBase):
                  box_roi_pool=None, box_head=None, box_predictor=None,
                  box_score_thresh=0.05,  # 移除低目标概率
                  box_nms_thresh=0.5,  # fast rcnn中进行nms的阈值
-                 box_detection_per_img=100,  # 对预测结果根据score排序取前100个
+                 box_detections_per_img=100,  # 对预测结果根据score排序取前100个
                  box_fg_iou_thresh=0.5, box_bg_iou_thresh=0.5,  # fast rcnn计算误差时，采集正负样本设置的阈值
                  box_batch_size_per_image=512, box_positive_fraction=0.25,  # fast rcnn计算误差时采样的样本数，以及正样本占所有样本的比例
                  bbox_reg_weights=None):

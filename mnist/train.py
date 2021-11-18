@@ -2,8 +2,7 @@ import torch
 from matplotlib import pyplot as plt
 from torch import nn
 
-import Animator
-import Accumulator
+from mnist import Accumulator, Animator
 
 
 def train(net, train_iter, test_iter, num_epochs, lr, device=None):

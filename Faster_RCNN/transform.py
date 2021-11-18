@@ -2,16 +2,20 @@
 
 # -------------------------------------------------------------------------------
 # Name:         transform.py
-# Description:  GeneralizedRCNNTransform in network
+# Description:  GeneralizedRCNNTransform in network，包括标准化才处理，resize，打包成batch和postproces(把bboxes还原到原尺寸图象)
 # Author:       WaBiKong
 # Date:         2021/11/17
 # -------------------------------------------------------------------------------
+
 import math
+from typing import List, Tuple
 
 import torch
 import torch.nn.functional as F
 import torchvision
 from torch import nn
+
+from image_list import ImageList
 
 
 class GeneralizedRCNNTransform(nn.Module):
@@ -34,7 +38,7 @@ class GeneralizedRCNNTransform(nn.Module):
         return (image - mean[:, None, None]) / std[:, None, None]
 
     def resize(self, image, target):
-        # type: (Tensor, Optional[DIct[str, Tensor]]) -> Tuple(Tensor, Optional[Dict[str, Tensor]])
+        # type: (Tensor, Optional[DIct[str, Tensor]]) -> Tuple[Tensor, Optional[Dict[str, Tensor]]]
         """
         将图片缩放到指定大小范围内，并相应缩放 bboxes信息
         Args:
@@ -121,6 +125,54 @@ class GeneralizedRCNNTransform(nn.Module):
 
         return batched_imgs
 
+    def postprocess(self, result, image_shapes, original_image_sizes):
+        # type: (List[Dict[str, Tensor]], List[Tuple[int, int]], List[Tuple[int, int]]) -> List[Dict[str, Tensor]]
+        """
+        对网络的预测结果进行后处理（主要将bboxes还原到原图像尺度上）
+        Args:
+            result: list(dict), 网络的预测结果, len(result) == batch_size
+            image_shapes: list(torch.Size), 图像预处理缩放后的尺寸, len(image_shapes) == batch_size
+            original_image_sizes: list(torch.Size), 图像的原始尺寸, len(original_image_sizes) == batch_size
+        Returns:
+        """
+        if self.training:  # 训练模式只需要获得损失进行反向传播
+            return result
+
+        # 预测模式下
+        # 遍历每张图片的预测信息，将boxes信息还原回原尺度
+        for i, (pred, im_s, o_im_s) in enumerate(zip(result, image_shapes, original_image_sizes)):
+            boxes = pred["boxes"]
+            boxes = resize_boxes(boxes, im_s, o_im_s)  # 将bboxes缩放回原图像尺度上
+            result[i]["boxes"] = boxes
+        return result
+
+    def forward(self, images, targets=None):
+        images = [img for img in images]
+        for i in range(len(images)):
+            image = images[i]
+            target_index = targets[i] if targets is not None else None
+
+            if image.dim() != 3:  # 验证输入的图片维度数是否为3
+                raise ValueError("images is expected to be a list of 3d tensors"
+                                 f" of shape [C, H, W], got{image.shape}")
+            image = self.normalize(image)  # 对图像进行标准化处理
+            image, target_index = self.resize(image, target_index)  # 将图像和对应的bboxes缩放到指定的范围内
+            images[i] = image
+            if targets is not None and target_index is not None:
+                targets[i] = target_index
+
+        # 记录resize后的图像尺寸
+        image_sizes = [img.shape[-2:] for img in images]
+        images = self.batch_images(images)  # 将images打包成一个batch
+
+        image_sizes_list = torch.jit.annotate(List[Tuple[int, int]], [])
+        for image_size in image_sizes:
+            assert len(image_size) == 2
+            image_sizes_list.append((image_size[0], image_size[1]))
+
+        image_list = ImageList(images, image_sizes_list)  # 将图片和resize后的大小关联起来
+        return image_list, targets
+
     def torch_choice(self, k):
         # type: (List[int]) -> int
         """
@@ -161,6 +213,16 @@ class GeneralizedRCNNTransform(nn.Module):
             for index, item in enumerate(sublist):
                 maxes[index] = max(maxes[index], item)
         return maxes
+
+    def __repr__(self):
+        """自定义输出实例化对象的信息，可通过print打印实例信息"""
+        format_string = self.__class__.__name__ + '('
+        _indent = '\n    '
+        format_string += "{0}Normalize(mean={1}, std={2})".format(_indent, self.image_mean, self.image_std)
+        format_string += "{0}Resize(min_size={1}, max_size={2}, mode='bilinear')".format(_indent, self.min_size,
+                                                                                         self.max_size)
+        format_string += '\n)'
+        return format_string
 
 
 def resize_boxes(boxes, original_size, new_size):
