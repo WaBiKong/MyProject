@@ -40,8 +40,8 @@ def main():
 
     try:
         # 创建文件 train.txt 和 val.txt
-        train_f = open('./data/VOCdevkit/VOC2012/train.txt', 'x')
-        eval_f = open('./data/VOCdevkit/VOC2012/val.txt', 'x')
+        train_f = open('./data/VOCdevkit/VOC2012/train.txt', 'w')
+        eval_f = open('./data/VOCdevkit/VOC2012/val.txt', 'w')
         # 列表中的每个元素用'\n'拼接
         train_f.write('\n'.join(train_files))
         eval_f.write('\n'.join(val_files))
