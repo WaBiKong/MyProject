@@ -14,6 +14,7 @@ import torch.nn.functional as F
 from collections import OrderedDict
 from typing import Tuple, List, Dict, Optional, Union
 
+from rpn_function import AnchorsGenerator, RPNHead, RegionProposalNetwork
 from transform import GeneralizedRCNNTransform
 
 
