@@ -13,7 +13,7 @@ from torch import Tensor
 
 class ImageList(object):
     def __init__(self, tensors, image_sizes):
-        # type: (Tensor, List[Tuple[int, int]])
+        # type: (Tensor, List[Tuple[int, int]]) -> None
         """
         Args:
             tensors: padding后的图像数据

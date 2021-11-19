@@ -2,19 +2,22 @@
 
 # -------------------------------------------------------------------------------
 # Name:         faster_rcnn_farmework.py
-# Description:  faste_rcnn基本框架
+# Description:  faste_rcnn基本框架：包括FasterRCNNBase类和继承自FasterRCNNBase的FasterRCNN类
 # Author:       WaBiKong
 # Date:         2021/11/17
 # -------------------------------------------------------------------------------
 
 import warnings
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 from collections import OrderedDict
-from typing import Tuple, List, Dict, Optional, Union
+from typing import Tuple, List, Dict, Optional
 
-from rpn_function import AnchorsGenerator, RPNHead, RegionProposalNetwork
+from Faster_RCNN.RPN.AnchorsGenerator import AnchorsGenerator
+from Faster_RCNN.RPN.RPNHead import RPNHead
+from Faster_RCNN.RPN.RegionProposalNetwork import RegionProposalNetwork
+
 from transform import GeneralizedRCNNTransform
 
 
