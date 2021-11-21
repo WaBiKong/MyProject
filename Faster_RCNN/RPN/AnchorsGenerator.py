@@ -94,6 +94,25 @@ class AnchorsGenerator(nn.Module):
         self._cache.clear()
         return anchors
 
+    # 通过提供的sizes和aspect_ratios在每个cell上生成anchors模板
+    def set_cell_anchors(self, dtype, device):
+        # type: (torch.dtype, torch.device) -> None
+        if self.cell_anchors is not None:
+            cell_anchors = self.cell_anchors
+            assert cell_anchors is not None
+            # suppose that all anchors have the same device
+            # which is a valid assumption in the current state of the codebase
+            if cell_anchors[0].device == device:
+                return
+
+        # 根据提供的sizes和aspect_ratios生成anchors模板
+        # anchors模板都是以(0, 0)为中心的anchor
+        cell_anchors = [
+            self.generate_anchors(sizes, aspect_ratios, dtype, device)
+            for sizes, aspect_ratios in zip(self.sizes, self.aspect_ratios)
+        ]
+        self.cell_anchors = cell_anchors
+
     # 在set_cell_anchors中被调用，用来生成anchors
     def generate_anchors(self, scales, aspect_ratios, dtype=torch.float32, device=torch.device("cpu")):
         # type: (List[int], List[float], torch.dtype, torch.device) -> Tensor
@@ -123,25 +142,6 @@ class AnchorsGenerator(nn.Module):
         base_anchors = torch.stack([-ws, -hs, ws, hs], dim=1) / 2
 
         return base_anchors.round()  # round 四舍五入
-
-    # 通过提供的sizes和aspect_ratios在每个cell上生成anchors模板
-    def set_cell_anchors(self, dtype, device):
-        # type: (torch.dtype, torch.device) -> None
-        if self.cell_anchors is not None:
-            cell_anchors = self.cell_anchors
-            assert cell_anchors is not None
-            # suppose that all anchors have the same device
-            # which is a valid assumption in the current state of the codebase
-            if cell_anchors[0].device == device:
-                return
-
-        # 根据提供的sizes和aspect_ratios生成anchors模板
-        # anchors模板都是以(0, 0)为中心的anchor
-        cell_anchors = [
-            self.generate_anchors(sizes, aspect_ratios, dtype, device)
-            for sizes, aspect_ratios in zip(self.sizes, self.aspect_ratios)
-        ]
-        self.cell_anchors = cell_anchors
 
     def num_anchors_per_location(self):
         # 计算每个预测特征层上每个滑动窗口的预测目标数
@@ -203,5 +203,3 @@ class AnchorsGenerator(nn.Module):
         anchors = self.grid_anchors(grid_sizes, strides)
         self._cache[key] = anchors
         return anchors
-
-

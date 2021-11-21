@@ -80,7 +80,7 @@ class GeneralizedRCNNTransform(nn.Module):
         # 根据图像的缩放比例来缩放bbox
         # (h, w): 原始尺寸
         # image.shape[-2:]: 缩放后的高度宽度
-        bbox = resize_boxes(bbox, (h, w), image.shape[-2:])
+        bbox = resize_boxes(bbox, [h, w], image.shape[-2:])
         target['boxes'] = bbox
 
         return image, target
@@ -240,7 +240,7 @@ def resize_boxes(boxes, original_size, new_size):
     ratios = [
         torch.tensor(s, dtype=torch.float32, device=boxes.device) /
         torch.tensor(s_orig, dtype=torch.float32, device=boxes.device)
-        for s, s_orig in zip(new_size, original_size)
+        for s, s_orig in zip(new_size,  )
     ]
     ratios_height, ratios_width = ratios
     # Removes a tensor dimension, boxes [minibatch, 4]

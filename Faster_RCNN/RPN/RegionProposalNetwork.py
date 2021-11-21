@@ -2,7 +2,20 @@
 
 # -------------------------------------------------------------------------------
 # Name:         RegionProposalNetwork.py
-# Description:  RegionProposalNetwork整个框架
+# Desc:  RegionProposalNetwork整个框架
+# Desc:  第一步：预测和生成anchors
+# Desc:  通过RPHHead生成预测目标分数和预测回归参数，通过AnchorsGenerator生成anchors
+# Desc:  第二步：生成proposal建议框
+# Desc:  首先调整回归参数内部tensor格式以及shape，以便后面将预测值与anchor进行结合、对proposal进行过滤
+# Desc:  再将预测的bbox regression回归参数应用到anchors上得到最终预测bbox坐标proposal
+# Desc:  然后将proposal通过过滤器获取前post_nms_top_n个目标
+# Desc:  过滤步骤：先获取每张预测特征图上预测概率(置信度)排前pre_nms_top_n的目标，然后对每张图片进行nms，得到过滤后的proposal
+# Desc:  第三步：计算损失
+# Desc:  首先根据每个anchors与gt box的IoU计算每个anchor对应的gt box，并分类正负及舍去的样本labels
+# Desc:  然后根据gt boxs和anchors计算每个anchors的真实回归参数
+# Desc:  再分别对labels中的正负样本进行随机采样得到用以计算损失的正负样本sampled_inds(anchors索引)
+# Desc:  在用以计算损失的样本中，使用smooth_l1_loss对正样本sampled_pos_inds所对应的真实回归参数与预测回归参数进行损失计算
+# Desc:  使用l1_loss对所有sampled_inds进行分类损失计算，等到RPN层的总损失
 # Author:       WaBiKong
 # Date:         2021/11/18
 # -------------------------------------------------------------------------------
@@ -109,7 +122,7 @@ class RegionProposalNetwork(nn.Module):
         # features是所有预测特征层组成的OrderedDict
         features = list(features.values())
 
-        # 计算每个预测特征层上的预测目标概率和bboxes regression参数
+        # 计算每个预测特征层上的预测目标概率和bboxes regression回归于此参数参数
         # objectness和pred_bbox_deltas都是list
         objectness, pred_bbox_deltas = self.head(features)
 
@@ -133,8 +146,8 @@ class RegionProposalNetwork(nn.Module):
         # note that we detach the deltas because Faster R-CNN do not backprop through
         # the proposals
         # 将预测的bbox regression参数应用到anchors上得到最终预测bbox坐标
-        proposals = self.box_coder.decode(pred_bbox_deltas.detach(), anchors)
-        proposals = proposals.view(num_images, -1, 4)
+        proposals = self.box_coder.decode(pred_bbox_deltas.detach(), anchors)  # [all anchors, 4]
+        proposals = proposals.view(num_images, -1, 4)  # [batch_size, anchors, 4]
 
         # 筛除小boxes框，nms处理，根据预测概率获取前post_nms_top_n个目标
         boxes, scores = self.filter_proposals(proposals, objectness, images.image_sizes, num_anchors_per_level)
@@ -143,6 +156,8 @@ class RegionProposalNetwork(nn.Module):
         if self.training:
             assert targets is not None
             # 计算每个anchors最匹配的gt，并将anchors进行分类，前景，背景以及废弃的anchors
+            # labels: 每个anchor所对应的样本类型，1为正样本，0为负样本，-2为舍弃样本
+            # matched_gt_boxes: 每个anchor所对应的gt box
             labels, matched_gt_boxes = self.assign_targets_to_anchors(anchors, targets)
             # 结合anchors以及对应的gt，计算regression参数
             regression_targets = self.box_coder.encode(matched_gt_boxes, anchors)
@@ -155,15 +170,104 @@ class RegionProposalNetwork(nn.Module):
             }
         return boxes, losses
 
-    def pre_nms_top_n(self):
-        if self.training:
-            return self._pre_nms_top_n['training']
-        return self._pre_nms_top_n['testing']
+    def filter_proposals(self, proposals, objectness, image_shapes, num_anchors_per_level):
+        # type: (Tensor, Tensor, List[Tuple[int, int]], List[int]) -> Tuple[List[Tensor], List[Tensor]]
+        """
+        筛除小boxes框，nms处理，根据预测概率获取前post_nms_top_n个目标
+        Args:
+            proposals: 预测的bbox坐标
+            objectness: 预测的目标概率
+            image_shapes: batch中每张图片的size信息
+            num_anchors_per_level: 每个预测特征层上预测anchors的数目
+        Returns:
+        """
+        num_images = proposals.shape[0]  # batch_size
+        device = proposals.device
 
-    def post_nms_top_n(self):
-        if self.training:
-            return self._post_nms_top_n['training']
-        return self._post_nms_top_n['testing']
+        # do not backprop throught objectness
+        # detach()丢去原有的梯度信息
+        objectness = objectness.detach()
+        objectness = objectness.reshape(num_images, -1)  # [batch_size, anchors]
+
+        # Returns a tensor of size size filled with fill_value
+        # levels负责记录分隔不同预测特征层上的anchors索引信息
+        # levels中用idx来区分先前合并的各个预测特征层的anchors分别属于哪个特征层
+        levels = [torch.full((n,), idx, dtype=torch.int64, device=device)
+                  for idx, n in enumerate(num_anchors_per_level)]
+        levels = torch.cat(levels, 0)
+
+        # Expand this tensor to the same size as objectness
+        levels = levels.reshape(1, -1).expand_as(objectness)
+
+        # select top_n boxes independently per level before applying nms
+        # 获取每张预测特征图上预测概率排前pre_nms_top_n的anchors索引值
+        top_n_idx = self._get_top_n_idx(objectness, num_anchors_per_level)
+
+        image_range = torch.arange(num_images, device=device)
+        batch_idx = image_range[:, None]  # [batch_size, 1]
+
+        # 根据每个预测特征层预测概率排前pre_nms_top_n的anchors索引值获取相应概率信息
+        objectness = objectness[batch_idx, top_n_idx]
+        levels = levels[batch_idx, top_n_idx]
+        # 预测概率排前pre_nms_top_n的anchors索引值获取相应bbox坐标信息
+        proposals = proposals[batch_idx, top_n_idx]
+
+        objectness_prob = torch.sigmoid(objectness)
+
+        final_boxes = []
+        final_scores = []
+        # 遍历每张图像的相关预测信息
+        for boxes, scores, lvl, img_shape in zip(proposals, objectness_prob, levels, image_shapes):
+            # 调整预测的boxes信息，将越界的坐标调整到图片边界上
+            boxes = box_ops.clip_boxes_to_image(boxes, img_shape)
+
+            # 删除boxes不满足宽，高都大于min_size的索引
+            keep = box_ops.remove_small_boxes(boxes, self.min_size)
+            boxes, scores, lvl = boxes[keep], scores[keep], lvl[keep]
+
+            # 移除小概率boxes，参考下面这个链接
+            # https://github.com/pytorch/vision/pull/3205
+            keep = torch.where(torch.ge(scores, self.score_thresh))[0]  # ge: >=
+            boxes, scores, lvl = boxes[keep], scores[keep], lvl[keep]
+
+            # non-maximum suppression, independently done per level
+            keep = box_ops.batched_nms(boxes, scores, lvl, self.nms_thresh)
+
+            # keep only topk scoring predictions
+            keep = keep[: self.post_nms_top_n()]
+            boxes, scores = boxes[keep], scores[keep]
+
+            final_boxes.append(boxes)
+            final_scores.append(scores)
+        return final_boxes, final_scores
+
+    def _get_top_n_idx(self, objectness, num_anchors_per_level):
+        # type: (Tensor, List[int]) -> Tensor
+        """
+        获取每张预测特征图上预测概率排前pre_nms_top_n的anchors索引值
+        Args:
+            objectness: Tensor(每张图像的预测目标概率信息 )
+            num_anchors_per_level: List（每个预测特征层上的预测的anchors个数）
+        Returns:
+        """
+        r = []  # 记录每个预测特征层上预测目标概率前pre_nms_top_n的索引信息
+        offset = 0
+        # 遍历每个预测特征层上的预测目标概率信息
+        # 将objectness按num_anchors_per_level(每个特征层的anchors数)切割
+        for ob in objectness.split(num_anchors_per_level, 1):
+            if torchvision._is_tracing():
+                num_anchors, pre_nms_top_n = _onnx_get_num_anchors_and_pre_nms_top_n(ob, self.pre_nms_top_n())
+            else:
+                num_anchors = ob.shape[1]  # 预测特征层上的预测的anchors个数
+                pre_nms_top_n = min(self.pre_nms_top_n(), num_anchors)  # 取self.pre_nms_top_n()和此预测特征层上anchors数的最小值
+
+            # Returns the k largest elements of the given input tensor along a given dimension
+            # ob.topk()在dim=1上对ob进行从大到小排序，即对此预测层上的所有anchors的预测值(置信度d)进行排序
+            # 并获取前pre_nms_top_n个在ob中的索引
+            _, top_n_idx = ob.topk(pre_nms_top_n, dim=1)
+            r.append(top_n_idx + offset)  # 单个预测特征层的偏移量(anchors总数) + 前pre_nms_top_n个的索引表示在整个objectness中的索引
+            offset += num_anchors
+        return torch.cat(r, dim=1)
 
     def assign_targets_to_anchors(self, anchors, targets):
         # type: (List[Tensor], List[Dict[str, Tensor]]) -> Tuple[List[Tensor], List[Tensor]]
@@ -219,100 +323,6 @@ class RegionProposalNetwork(nn.Module):
             matched_gt_boxes.append(matched_gt_boxes_per_image)
         return labels, matched_gt_boxes
 
-    def _get_top_n_idx(self, objectness, num_anchors_per_level):
-        # type: (Tensor, List[int]) -> Tensor
-        """
-        获取每张预测特征图上预测概率排前pre_nms_top_n的anchors索引值
-        Args:
-            objectness: Tensor(每张图像的预测目标概率信息 )
-            num_anchors_per_level: List（每个预测特征层上的预测的anchors个数）
-        Returns:
-        """
-        r = []  # 记录每个预测特征层上预测目标概率前pre_nms_top_n的索引信息
-        offset = 0
-        # 遍历每个预测特征层上的预测目标概率信息
-        for ob in objectness.split(num_anchors_per_level, 1):
-            if torchvision._is_tracing():
-                num_anchors, pre_nms_top_n = _onnx_get_num_anchors_and_pre_nms_top_n(ob, self.pre_nms_top_n())
-            else:
-                num_anchors = ob.shape[1]  # 预测特征层上的预测的anchors个数
-                pre_nms_top_n = min(self.pre_nms_top_n(), num_anchors)
-
-            # Returns the k largest elements of the given input tensor along a given dimension
-            _, top_n_idx = ob.topk(pre_nms_top_n, dim=1)
-            r.append(top_n_idx + offset)
-            offset += num_anchors
-        return torch.cat(r, dim=1)
-
-    def filter_proposals(self, proposals, objectness, image_shapes, num_anchors_per_level):
-        # type: (Tensor, Tensor, List[Tuple[int, int]], List[int]) -> Tuple[List[Tensor], List[Tensor]]
-        """
-        筛除小boxes框，nms处理，根据预测概率获取前post_nms_top_n个目标
-        Args:
-            proposals: 预测的bbox坐标
-            objectness: 预测的目标概率
-            image_shapes: batch中每张图片的size信息
-            num_anchors_per_level: 每个预测特征层上预测anchors的数目
-        Returns:
-        """
-        num_images = proposals.shape[0]
-        device = proposals.device
-
-        # do not backprop throught objectness
-        objectness = objectness.detach()
-        objectness = objectness.reshape(num_images, -1)
-
-        # Returns a tensor of size size filled with fill_value
-        # levels负责记录分隔不同预测特征层上的anchors索引信息
-        levels = [torch.full((n,), idx, dtype=torch.int64, device=device)
-                  for idx, n in enumerate(num_anchors_per_level)]
-        levels = torch.cat(levels, 0)
-
-        # Expand this tensor to the same size as objectness
-        levels = levels.reshape(1, -1).expand_as(objectness)
-
-        # select top_n boxes independently per level before applying nms
-        # 获取每张预测特征图上预测概率排前pre_nms_top_n的anchors索引值
-        top_n_idx = self._get_top_n_idx(objectness, num_anchors_per_level)
-
-        image_range = torch.arange(num_images, device=device)
-        batch_idx = image_range[:, None]  # [batch_size, 1]
-
-        # 根据每个预测特征层预测概率排前pre_nms_top_n的anchors索引值获取相应概率信息
-        objectness = objectness[batch_idx, top_n_idx]
-        levels = levels[batch_idx, top_n_idx]
-        # 预测概率排前pre_nms_top_n的anchors索引值获取相应bbox坐标信息
-        proposals = proposals[batch_idx, top_n_idx]
-
-        objectness_prob = torch.sigmoid(objectness)
-
-        final_boxes = []
-        final_scores = []
-        # 遍历每张图像的相关预测信息
-        for boxes, scores, lvl, img_shape in zip(proposals, objectness_prob, levels, image_shapes):
-            # 调整预测的boxes信息，将越界的坐标调整到图片边界上
-            boxes = box_ops.clip_boxes_to_image(boxes, img_shape)
-
-            # 返回boxes满足宽，高都大于min_size的索引
-            keep = box_ops.remove_small_boxes(boxes, self.min_size)
-            boxes, scores, lvl = boxes[keep], scores[keep], lvl[keep]
-
-            # 移除小概率boxes，参考下面这个链接
-            # https://github.com/pytorch/vision/pull/3205
-            keep = torch.where(torch.ge(scores, self.score_thresh))[0]  # ge: >=
-            boxes, scores, lvl = boxes[keep], scores[keep], lvl[keep]
-
-            # non-maximum suppression, independently done per level
-            keep = box_ops.batched_nms(boxes, scores, lvl, self.nms_thresh)
-
-            # keep only topk scoring predictions
-            keep = keep[: self.post_nms_top_n()]
-            boxes, scores = boxes[keep], scores[keep]
-
-            final_boxes.append(boxes)
-            final_scores.append(scores)
-        return final_boxes, final_scores
-
     def compute_loss(self, objectness, pred_bbox_deltas, labels, regression_targets):
         # type: (Tensor, Tensor, List[Tensor], List[Tensor]) -> Tuple[Tensor, Tensor]
         """
@@ -355,6 +365,16 @@ class RegionProposalNetwork(nn.Module):
         )
 
         return objectness_loss, box_loss
+
+    def pre_nms_top_n(self):
+        if self.training:
+            return self._pre_nms_top_n['training']
+        return self._pre_nms_top_n['testing']
+
+    def post_nms_top_n(self):
+        if self.training:
+            return self._post_nms_top_n['training']
+        return self._post_nms_top_n['testing']
 
 
 @torch.jit.unused
@@ -431,5 +451,5 @@ def permute_and_flatten(layer, N, A, C, H, W):
     layer = layer.view(N, -1, C, H, W)
     # 调换tensor维度
     layer = layer.permute(0, 3, 4, 1, 2)  # [N, H, W, -1, C]
-    layer = layer.reshape(N, -1, C)  # -1位置为单个预测特征层anchors总数
+    layer = layer.reshape(N, -1, C)  # -1位置为单个预测特征层预测的anchors总数
     return layer
