@@ -21,6 +21,7 @@ def train(net, train_iter, test_iter, num_epochs, lr, device=None):
     animator = Animator.Animator(xlabel='epoch', xlim=[1, num_epochs], legend=['train loss', 'train acc', 'test acc'])
     num_batches = len(train_iter)
     for epoch in range(num_epochs):
+        print("epoch=", epoch)
         metric = Accumulator.Accumulator(3)
         net.train()
         # enumerate()函数，返回枚举对象，包括下标和值，此处为下标i、值(X, y)
@@ -39,6 +40,7 @@ def train(net, train_iter, test_iter, num_epochs, lr, device=None):
                 animator.add(epoch + (i + 1) / num_batches, (train_l, train_acc, None))
         test_acc = evaluate_accuracy_gpu(net, test_iter)
         animator.add(epoch + 1, (None, None, test_acc))
+        print("test_acc: ", test_acc)
     print(f'loss{train_l:.3f}, tarin acc{train_acc:.3f},test acc{test_acc:.3f}')
     plt.show()
 

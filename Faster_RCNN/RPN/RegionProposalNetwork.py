@@ -27,9 +27,10 @@ from torch import nn, Tensor
 from torch.nn import functional as F
 import torchvision
 
-from Faster_RCNN import det_utils
-import Faster_RCNN.boxes as box_ops
-from Faster_RCNN.image_list import ImageList
+from utils import det_utils
+import utils.boxes as box_ops
+from utils.image_list import ImageList
+from utils.smooth_l1_losss import smooth_l1_loss
 
 
 class RegionProposalNetwork(nn.Module):
@@ -352,7 +353,7 @@ class RegionProposalNetwork(nn.Module):
         regression_targets = torch.cat(regression_targets, dim=0)
 
         # 计算边界框回归损失
-        box_loss = det_utils.smooth_l1_loss(
+        box_loss = smooth_l1_loss(
             pred_bbox_deltas[sampled_pos_inds],
             regression_targets[sampled_pos_inds],
             beta=1 / 9,

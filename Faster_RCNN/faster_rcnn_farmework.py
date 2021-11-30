@@ -9,16 +9,18 @@
 
 import warnings
 import torch
-import torch.nn.functional as F
 from torch import nn
 from collections import OrderedDict
 from typing import Tuple, List, Dict, Optional
+from torchvision.ops import MultiScaleRoIAlign
 
-from Faster_RCNN.RPN.AnchorsGenerator import AnchorsGenerator
-from Faster_RCNN.RPN.RPNHead import RPNHead
-from Faster_RCNN.RPN.RegionProposalNetwork import RegionProposalNetwork
-
-from transform import GeneralizedRCNNTransform
+from ROI.FastRCNNPredictor import FastRCNNPredictor
+from ROI.roi_head import RoIHeads
+from RPN.AnchorsGenerator import AnchorsGenerator
+from RPN.RPNHead import RPNHead
+from RPN.RegionProposalNetwork import RegionProposalNetwork
+from ROI.TwoMLPHead import TwoMLPHead
+from utils.transform import GeneralizedRCNNTransform
 
 
 class FasterRCNNBase(nn.Module):
@@ -92,6 +94,8 @@ class FasterRCNNBase(nn.Module):
             features = OrderedDict([('0', features)])  # 若在多层特征图上预测，传入的就是一个有序字典
 
         # 将图片、特征层以及标注信息targets传入rpn中
+        # proposals: List[Tensor], Tensor_shape: [num_proposals, 4]
+        # 每个proposal是绝对坐标，且为(x1, y1, x2, y2)格式
         proposals, proposal_losses = self.rpn(images, features, targets)
 
         # 将rpn生成的数据以及标注信息targets信息传入fast_rcnn后半部分
@@ -113,53 +117,6 @@ class FasterRCNNBase(nn.Module):
             return losses, detections
         else:
             return self.eager_outputs(losses, detections)
-
-
-# class TwoMLPHead(nn.Module):
-#     """
-#     Standard heads for FPN-based models
-#     Arguments:
-#         in_channels (int): number of input channels
-#         representation_size (int): size of the intermediate representation
-#     """
-#
-#     def __init__(self, in_channels, representation_size):
-#         super(TwoMLPHead, self).__init__()
-#
-#         self.fc6 = nn.Linear(in_channels, representation_size)
-#         self.fc7 = nn.Linear(representation_size, representation_size)
-#
-#     def forward(self, x):
-#         x = x.flatten(start_dim=1)
-#
-#         x = F.relu(self.fc6(x))
-#         x = F.relu(self.fc7(x))
-#
-#         return x
-#
-#
-# class FastRCNNPredictor(nn.Module):
-#     """
-#     Standard classification + bounding box regression layers
-#     for Fast R-CNN.
-#     Arguments:
-#         in_channels (int): number of input channels
-#         num_classes (int): number of output classes (including background)
-#     """
-#
-#     def __init__(self, in_channels, num_classes):
-#         super(FastRCNNPredictor, self).__init__()
-#         self.cls_score = nn.Linear(in_channels, num_classes)
-#         self.bbox_pred = nn.Linear(in_channels, num_classes * 4)
-#
-#     def forward(self, x):
-#         if x.dim() == 4:
-#             assert list(x.shape[2:]) == [1, 1]
-#         x = x.flatten(start_dim=1)
-#         scores = self.cls_score(x)
-#         bbox_deltas = self.bbox_pred(x)
-#
-#         return scores, bbox_deltas
 
 
 # 定义FasterRCNN类继承自FasterRCNNBase类
@@ -251,6 +208,7 @@ class FasterRCNN(FasterRCNNBase):
                  rpn_fg_iou_thresh=0.7, rpn_bg_iou_thresh=0.3,  # rpn计算损失时，采集正负样本设置的阈值
                  rpn_batch_size_per_image=256,  # rpn计算损失时采样的样本数
                  rpn_positive_fraction=0.5,  # rpn计算损失时。正样本占总样本的比例
+                 rpn_score_thresh = 0.0,
                  # Box parameters
                  box_roi_pool=None, box_head=None, box_predictor=None,
                  box_score_thresh=0.05,  # 移除低目标概率
@@ -307,7 +265,8 @@ class FasterRCNN(FasterRCNNBase):
             rpn_anchor_generator, rpn_head,
             rpn_fg_iou_thresh, rpn_bg_iou_thresh,
             rpn_batch_size_per_image, rpn_positive_fraction,
-            rpn_pre_nms_top_n, rpn_post_nms_top_n, rpn_nms_thresh
+            rpn_pre_nms_top_n, rpn_post_nms_top_n, rpn_nms_thresh,
+            rpn_score_thresh
         )
 
         # fast rcnn中的roi pooling层
