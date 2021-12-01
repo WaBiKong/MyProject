@@ -54,7 +54,7 @@ def main(parser_data):
     if not os.path.exists("save_weights"):
         os.mkdir("save_weights")
 
-    results_file = "results{}.txt".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+    # results_file = "results{}.txt".format(datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
 
     data_transform = {
         "train": transforms.Compose([transforms.SSDCropping(),

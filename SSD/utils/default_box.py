@@ -15,10 +15,10 @@ import torch
 
 def dboxes300():
     figsize = 300  # 输入网络的图像大小
-    feat_size = [38, 19, 10, 5, 3, 1]  # 每个预测特征层的feature map尺寸
-    steps = [8, 16, 32, 64, 100, 300]  # 每个预测特征层上一个cell在原图上的跨度
+    feat_size = [38, 19, 10, 5, 3, 1]   # 每个预测层的feature map尺寸
+    steps = [8, 16, 32, 64, 100, 300]   # 每个特征层上的一个cell在原图上的跨度
     scales = [21, 45, 99, 153, 207, 261, 315]  # 每个特征层上预测的default box的scale
-    aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]  # 每个特征层上预测的default box的ratios
+    aspect_ratios = [[2], [2, 3], [2, 3], [2, 3], [2], [2]]  # 每个预测特征层上预测的default box的ratios
     dboxes = DefaultBoxes(figsize, feat_size, steps, scales, aspect_ratios)
     return dboxes
 
@@ -74,8 +74,8 @@ class DefaultBoxes(object):
         self.dboxes_ltrb = self.dboxes.clone()
         self.dboxes_ltrb[:, 0] = self.dboxes[:, 0] - 0.5 * self.dboxes[:, 2]  # xmin
         self.dboxes_ltrb[:, 1] = self.dboxes[:, 1] - 0.5 * self.dboxes[:, 3]  # xmin
-        self.dboxes_ltrb[:, 2] = self.dboxes[:, 0] - 0.5 * self.dboxes[:, 2]  # xmin
-        self.dboxes_ltrb[:, 3] = self.dboxes[:, 1] - 0.5 * self.dboxes[:, 3]  # xmin
+        self.dboxes_ltrb[:, 2] = self.dboxes[:, 0] + 0.5 * self.dboxes[:, 2]  # xmin
+        self.dboxes_ltrb[:, 3] = self.dboxes[:, 1] + 0.5 * self.dboxes[:, 3]  # xmin
 
     def __call__(self, order='ltrb'):
         # 根据需求返回相应格式的default box
