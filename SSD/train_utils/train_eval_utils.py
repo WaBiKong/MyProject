@@ -8,10 +8,13 @@
 # -------------------------------------------------------------------------------
 import math
 import sys
+import time
 
 import torch
 
 import distributed_utils as utils
+from SSD.train_utils.coco_eval import CocoEvaluator
+from SSD.train_utils.coco_utils import get_coco_api_from_dataset
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch,
@@ -78,62 +81,62 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch,
     return mloss, now_lr
 
 
-# @torch.no_grad()
-# def evaluate(model, data_loader, device, data_set=None):
-#
-#     cpu_device = torch.device("cpu")
-#     model.eval()
-#     metric_logger = utils.MetricLogger(delimiter="  ")
-#     header = "Test: "
-#
-#     if data_set is None:
-#         data_set = get_coco_api_from_dataset(data_loader.dataset)
-#     iou_types = _get_iou_types(model)
-#     coco_evaluator = CocoEvaluator(data_set, iou_types)
-#
-#     for images, targets in metric_logger.log_every(data_loader, 100, header):
-#         images = torch.stack(images, dim=0).to(device)
-#
-#         if device != torch.device("cpu"):
-#             torch.cuda.synchronize(device)
-#
-#         model_time = time.time()
-#         #  list((bboxes_out, labels_out, scores_out), ...)
-#         results = model(images, targets=None)
-#         model_time = time.time() - model_time
-#
-#         outputs = []
-#         for index, (bboxes_out, labels_out, scores_out) in enumerate(results):
-#             # 将box的相对坐标信息（0-1）转为绝对值坐标(xmin, ymin, xmax, ymax)
-#             height_width = targets[index]["height_width"]
-#             # 还原回原图尺度
-#             bboxes_out[:, [0, 2]] = bboxes_out[:, [0, 2]] * height_width[1]
-#             bboxes_out[:, [1, 3]] = bboxes_out[:, [1, 3]] * height_width[0]
-#
-#             info = {"boxes": bboxes_out.to(cpu_device),
-#                     "labels": labels_out.to(cpu_device),
-#                     "scores": scores_out.to(cpu_device)}
-#             outputs.append(info)
-#
-#         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
-#
-#         evaluator_time = time.time()
-#         coco_evaluator.update(res)
-#         evaluator_time = time.time() - evaluator_time
-#         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
-#
-#     # gather the stats from all processes
-#     metric_logger.synchronize_between_processes()
-#     print("Averaged stats:", metric_logger)
-#     coco_evaluator.synchronize_between_processes()
-#
-#     # accumulate predictions from all images
-#     coco_evaluator.accumulate()
-#     coco_evaluator.summarize()
-#
-#     coco_info = coco_evaluator.coco_eval[iou_types[0]].stats.tolist()  # numpy to list
-#
-#     return coco_info
+@torch.no_grad()
+def evaluate(model, data_loader, device, data_set=None):
+
+    cpu_device = torch.device("cpu")
+    model.eval()
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    header = "Test: "
+
+    if data_set is None:
+        data_set = get_coco_api_from_dataset(data_loader.dataset)
+    iou_types = _get_iou_types(model)
+    coco_evaluator = CocoEvaluator(data_set, iou_types)
+
+    for images, targets in metric_logger.log_every(data_loader, 100, header):
+        images = torch.stack(images, dim=0).to(device)
+
+        if device != torch.device("cpu"):
+            torch.cuda.synchronize(device)
+
+        model_time = time.time()
+        #  list((bboxes_out, labels_out, scores_out), ...)
+        results = model(images, targets=None)
+        model_time = time.time() - model_time
+
+        outputs = []
+        for index, (bboxes_out, labels_out, scores_out) in enumerate(results):
+            # 将box的相对坐标信息（0-1）转为绝对值坐标(xmin, ymin, xmax, ymax)
+            height_width = targets[index]["height_width"]
+            # 还原回原图尺度
+            bboxes_out[:, [0, 2]] = bboxes_out[:, [0, 2]] * height_width[1]
+            bboxes_out[:, [1, 3]] = bboxes_out[:, [1, 3]] * height_width[0]
+
+            info = {"boxes": bboxes_out.to(cpu_device),
+                    "labels": labels_out.to(cpu_device),
+                    "scores": scores_out.to(cpu_device)}
+            outputs.append(info)
+
+        res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
+
+        evaluator_time = time.time()
+        coco_evaluator.update(res)
+        evaluator_time = time.time() - evaluator_time
+        metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
+
+    # gather the stats from all processes
+    metric_logger.synchronize_between_processes()
+    print("Averaged stats:", metric_logger)
+    coco_evaluator.synchronize_between_processes()
+
+    # accumulate predictions from all images
+    coco_evaluator.accumulate()
+    coco_evaluator.summarize()
+
+    coco_info = coco_evaluator.coco_eval[iou_types[0]].stats.tolist()  # numpy to list
+
+    return coco_info
 
 
 def _get_iou_types(model):

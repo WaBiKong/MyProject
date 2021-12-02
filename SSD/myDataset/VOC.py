@@ -167,6 +167,7 @@ class VOC2012Dataset(Dataset):
         data = self.parse_xml_to_dict(xml)["annotation"]
         data_height = int(data["size"]["height"])
         data_width = int(data["size"]["width"])
+        height_width = [data_height, data_width]
         # img_path = os.path.join(self.img_root, data["filename"])
         # image = Image.open(img_path)
         # if image.format != "JPEG":
@@ -175,10 +176,11 @@ class VOC2012Dataset(Dataset):
         labels = []
         iscrowd = []
         for obj in data["object"]:
-            xmin = float(obj["bndbox"]["xmin"])
-            xmax = float(obj["bndbox"]["xmax"])
-            ymin = float(obj["bndbox"]["ymin"])
-            ymax = float(obj["bndbox"]["ymax"])
+            # 将所有的gt box信息转换成相对值0-1之间
+            xmin = float(obj["bndbox"]["xmin"]) / data_width
+            xmax = float(obj["bndbox"]["xmax"]) / data_width
+            ymin = float(obj["bndbox"]["ymin"]) / data_height
+            ymax = float(obj["bndbox"]["ymax"]) / data_height
             boxes.append([xmin, ymin, xmax, ymax])
             labels.append(self.class_dict[obj["name"]])
             iscrowd.append(int(obj["difficult"]))
@@ -187,12 +189,19 @@ class VOC2012Dataset(Dataset):
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         labels = torch.as_tensor(labels, dtype=torch.int64)
         iscrowd = torch.as_tensor(iscrowd, dtype=torch.int64)
+        height_width = torch.as_tensor(height_width, dtype=torch.int64)
         image_id = torch.tensor([idx])
         area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
 
-        target = {"boxes": boxes, "labels": labels, "image_id": image_id, "area": area, "iscrowd": iscrowd}
+        target = {}
+        target["boxes"] = boxes
+        target["labels"] = labels
+        target["image_id"] = image_id
+        target["area"] = area
+        target["iscrowd"] = iscrowd
+        target["height_width"] = height_width
 
-        return (data_height, data_width), target
+        return target
 
 # """
 # 使用Dataloader测试类VOC2012Dataset的情况
