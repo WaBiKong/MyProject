@@ -122,17 +122,17 @@ def main():
         train_loss.append(mean_loss.item())
         learning_rate.append(lr)
 
-        # # evaluate on the test dataset
-        # coco_info = utils.evaluate(model, val_data_loader, device=device)
-        #
-        # # write into txt
-        # with open(results_file, "a") as f:
-        #     # 写入的数据包括coco指标还有loss和learning rate
-        #     result_info = [str(round(i, 4)) for i in coco_info + [mean_loss.item()]] + [str(round(lr, 6))]
-        #     txt = "epoch:{} {}".format(epoch, '  '.join(result_info))
-        #     f.write(txt + "\n")
-        #
-        # val_map.append(coco_info[1])  # pascal mAP
+        # evaluate on the test dataset
+        coco_info = utils.evaluate(model, val_data_loader, device=device)
+
+        # write into txt
+        with open(results_file, "a") as f:
+            # 写入的数据包括coco指标还有loss和learning rate
+            result_info = [str(round(i, 4)) for i in coco_info + [mean_loss.item()]] + [str(round(lr, 6))]
+            txt = "epoch:{} {}".format(epoch, '  '.join(result_info))
+            f.write(txt + "\n")
+
+        val_map.append(coco_info[1])  # pascal mAP
 
     torch.save(model.state_dict(), "./save_weights/vgg/pretrain.pth")
 
@@ -169,17 +169,17 @@ def main():
         # update the learning rate
         lr_scheduler.step()
 
-        # # evaluate on the test dataset
-        # coco_info = utils.evaluate(model, val_data_loader, device=device)
-        #
-        # # write into txt
-        # with open(results_file, "a") as f:
-        #     # 写入的数据包括coco指标还有loss和learning rate
-        #     result_info = [str(round(i, 4)) for i in coco_info + [mean_loss.item()]] + [str(round(lr, 6))]
-        #     txt = "epoch:{} {}".format(epoch, '  '.join(result_info))
-        #     f.write(txt + "\n")
-        #
-        # val_map.append(coco_info[1])  # pascal mAP
+        # evaluate on the test dataset
+        coco_info = utils.evaluate(model, val_data_loader, device=device)
+
+        # write into txt
+        with open(results_file, "a") as f:
+            # 写入的数据包括coco指标还有loss和learning rate
+            result_info = [str(round(i, 4)) for i in coco_info + [mean_loss.item()]] + [str(round(lr, 6))]
+            txt = "epoch:{} {}".format(epoch, '  '.join(result_info))
+            f.write(txt + "\n")
+
+        val_map.append(coco_info[1])  # pascal mAP
 
         # save weights
         # 仅保存最后5个epoch的权重

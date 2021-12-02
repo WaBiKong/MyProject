@@ -13,8 +13,8 @@ import time
 import torch
 
 from Faster_RCNN.train_utils import distributed_utils as utils
-# from Faster_RCNN.train_utils.coco_eval import CocoEvaluator
-# from Faster_RCNN.train_utils.coco_utils import get_coco_api_from_dataset
+from Faster_RCNN.train_utils.coco_eval import CocoEvaluator
+from Faster_RCNN.train_utils.coco_utils import get_coco_api_from_dataset
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch,
@@ -76,49 +76,49 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch,
     return mloss, now_lr
 
 
-# @torch.no_grad()
-# def evaluate(model, data_loader, device):
-#     cpu_device = torch.device("cpu")
-#     model.eval()
-#     metric_logger = utils.MetricLogger(delimiter="  ")
-#     header = "Test: "
-#
-#     coco = get_coco_api_from_dataset(data_loader.dataset)
-#     iou_types = _get_iou_types(model)
-#     coco_evaluator = CocoEvaluator(coco, iou_types)
-#
-#     for image, targets in metric_logger.log_every(data_loader, 100, header):
-#         image = list(img.to(device) for img in image)
-#
-#         # 当使用CPU时，跳过GPU相关指令
-#         if device != torch.device("cpu"):
-#             torch.cuda.synchronize(device)
-#
-#         model_time = time.time()
-#         outputs = model(image)
-#
-#         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
-#         model_time = time.time() - model_time
-#
-#         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
-#
-#         evaluator_time = time.time()
-#         coco_evaluator.update(res)
-#         evaluator_time = time.time() - evaluator_time
-#         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
-#
-#     # gather the stats from all processes
-#     metric_logger.synchronize_between_processes()
-#     print("Averaged stats:", metric_logger)
-#     coco_evaluator.synchronize_between_processes()
-#
-#     # accumulate predictions from all images
-#     coco_evaluator.accumulate()
-#     coco_evaluator.summarize()
-#
-#     coco_info = coco_evaluator.coco_eval[iou_types[0]].stats.tolist()  # numpy to list
-#
-#     return coco_info
+@torch.no_grad()
+def evaluate(model, data_loader, device):
+    cpu_device = torch.device("cpu")
+    model.eval()
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    header = "Test: "
+
+    coco = get_coco_api_from_dataset(data_loader.dataset)
+    iou_types = _get_iou_types(model)
+    coco_evaluator = CocoEvaluator(coco, iou_types)
+
+    for image, targets in metric_logger.log_every(data_loader, 100, header):
+        image = list(img.to(device) for img in image)
+
+        # 当使用CPU时，跳过GPU相关指令
+        if device != torch.device("cpu"):
+            torch.cuda.synchronize(device)
+
+        model_time = time.time()
+        outputs = model(image)
+
+        outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
+        model_time = time.time() - model_time
+
+        res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
+
+        evaluator_time = time.time()
+        coco_evaluator.update(res)
+        evaluator_time = time.time() - evaluator_time
+        metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
+
+    # gather the stats from all processes
+    metric_logger.synchronize_between_processes()
+    print("Averaged stats:", metric_logger)
+    coco_evaluator.synchronize_between_processes()
+
+    # accumulate predictions from all images
+    coco_evaluator.accumulate()
+    coco_evaluator.summarize()
+
+    coco_info = coco_evaluator.coco_eval[iou_types[0]].stats.tolist()  # numpy to list
+
+    return coco_info
 
 
 def _get_iou_types(model):
