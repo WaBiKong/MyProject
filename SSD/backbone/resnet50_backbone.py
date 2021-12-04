@@ -118,3 +118,23 @@ class ResNet(nn.Module):
 
 def resnet50(num_classes=1000, include_top=True):
     return ResNet(Bottleneck, [3, 4, 6, 3], num_classes=num_classes, include_top=include_top)
+
+
+class Darknet(nn.Module):
+    """
+    YOLOv3 spp object detection model
+    """
+
+    def __init__(self, cfg, img_size=(416, 416), verbose=False):
+        super(Darknet, self).__init__()
+        # 这里传入的imgz_size只在导出ONNX模型时起作用
+        self.input_size = [img_size] * 2 if isinstance(img_size, int) else img_size
+        # 解析网络对应的,.cfg文件
+        self.modules_defs = parse_model_cfg(cfg)
+        # 根据解析的网络结构一层一层去搭建
+        self.module_list, self.module_routs = create_modules(self.modules_defs, img_size)
+        # 获取所有YOLOlayer层的索引
+        self.yolo_layers = get_yolo_layers(self)
+
+        # 打印模型的信息，如果verbose为True则打印详细信息
+        self.info(verbose) if not ONNX_EXPORT else None
